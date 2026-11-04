@@ -1,4 +1,4 @@
-{\rtf1}<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
@@ -76,7 +76,7 @@
       <p class="text-4xl font-black text-blue-600 mt-1"><span id="waitingCount">0</span>명</p>
     </div>
 
-    <!-- 대기 신청/취소 버튼 영역 (학생 전용) -->
+    <!-- 대기 신청/취소 버튼 영역 -->
     <div id="studentActionArea" class="mb-4">
       <button id="joinBtn" onclick="requestJoin()" class="w-full bg-green-600 text-white py-3.5 rounded-xl font-bold text-lg shadow hover:bg-green-700">대기 신청하기</button>
       <div id="loadingText" class="hidden w-full bg-gray-200 text-gray-600 py-3.5 rounded-xl font-bold text-center text-base">
@@ -110,6 +110,9 @@
   </div>
 
   <script>
+    // =========================================================================
+    // 🔥 파이어베이스 인증 정보 입력 (본인 1단계 복사값으로 변경)
+    // =========================================================================
     const firebaseConfig = {
   apiKey: "AIzaSyCMJbfHs2qdvIYpYTWHuhYoWvwCoeomicM",
   authDomain: "park1408-5d9f5.firebaseapp.com",
@@ -120,14 +123,27 @@
   appId: "1:900133376382:web:c31ef78403b7c1f398232f"
 };
 
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.database();
-    const queuesRef = db.ref('queues');
+    let db = null;
+    let queuesRef = null;
 
-    const urlParams = new URLSearchParams(window.location.search);
-    let currentBooth = urlParams.get('booth') || "1-1"; 
-    let currentMode = urlParams.get('mode') || "";
+    // 파이어베이스 안전 초기화 함수 (에러 방지)
+    function initFirebase() {
+      if (db && queuesRef) return true;
+      try {
+        if (!firebase.apps.length) {
+          firebase.initializeApp(firebaseConfig);
+        }
+        db = firebase.database();
+        queuesRef = db.ref('queues');
+        return true;
+      } catch (e) {
+        console.warn("파이어베이스 연결 대기 또는 Config 미설정:", e.message);
+        return false;
+      }
+    }
 
+    let currentBooth = "1-1"; 
+    let currentMode = "";
     let studentId = "";
     let studentName = "";
     let isOperator = false;
@@ -136,6 +152,11 @@
     let allQueuesData = {};
 
     window.onload = function() {
+      const urlParams = new URLSearchParams(window.location.search);
+      currentBooth = urlParams.get('booth') || "1-1"; 
+      currentMode = (urlParams.get('mode') || "").toLowerCase();
+
+      // 1. ?mode=qr 접속 시 파이어베이스 미연결 상태여도 100% 즉시 QR 화면 출력
       if (currentMode === 'qr') {
         renderQrPrintPage();
         return;
@@ -177,11 +198,15 @@
           `;
           grid.appendChild(card);
 
-          new QRCode(document.getElementById(qrContainerId), {
-            text: targetUrl,
-            width: 140,
-            height: 140
-          });
+          try {
+            new QRCode(document.getElementById(qrContainerId), {
+              text: targetUrl,
+              width: 140,
+              height: 140
+            });
+          } catch(e) {
+            console.error("QR 생성 중 오류:", e);
+          }
         }
       }
     }
@@ -211,7 +236,7 @@
 
     function logout() {
       if (confirm("로그아웃 하시겠습니까?\n(신청된 대기열이 자동으로 취소됩니다)")) {
-        if (studentId) {
+        if (initFirebase() && studentId) {
           Object.keys(allQueuesData).forEach(key => {
             const item = allQueuesData[key];
             if (item.studentId === studentId && (item.status === 'WAITING' || item.status === 'CALLED')) {
@@ -264,11 +289,12 @@
 
       document.getElementById('queueView').classList.remove('hidden');
 
-      // 초고속 실시간 푸시 데이터 수신
-      queuesRef.on('value', (snapshot) => {
-        allQueuesData = snapshot.val() || {};
-        renderQueue();
-      });
+      if (initFirebase()) {
+        queuesRef.on('value', (snapshot) => {
+          allQueuesData = snapshot.val() || {};
+          renderQueue();
+        });
+      }
     }
 
     function renderQueue() {
@@ -363,6 +389,11 @@
     }
 
     function requestJoin() {
+      if (!initFirebase()) {
+        alert("파이어베이스 설정 정보(firebaseConfig)가 바르게 입력되지 않았습니다.");
+        return;
+      }
+
       if (!studentId || studentId.length !== 4) {
         alert("학번 정보가 누락되었습니다.");
         return;
@@ -411,17 +442,19 @@
     }
 
     function requestCancel() {
-      if (!currentQueueKey) return;
+      if (!currentQueueKey || !initFirebase()) return;
       if (confirm("정말 대기를 취소하시겠습니까?")) {
         queuesRef.child(currentQueueKey).update({ status: 'CANCELLED' });
       }
     }
 
     function callUser(key) {
+      if (!initFirebase()) return;
       queuesRef.child(key).update({ status: 'CALLED' });
     }
 
     function completeUser(key) {
+      if (!initFirebase()) return;
       queuesRef.child(key).update({ status: 'COMPLETED' });
     }
 
