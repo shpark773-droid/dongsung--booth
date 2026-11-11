@@ -7,11 +7,30 @@
   
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- 브라우저 자체 QR 코드 생성 라이브러리 -->
+  <!-- QR 코드 라이브러리 -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-  <!-- Firebase JS SDK v9 (compat 모드) -->
+  <!-- Firebase JS SDK v9 (compat) -->
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            naver: {
+              DEFAULT: '#03C75A',
+              hover: '#02b350',
+              light: '#E8F9EE',
+              dark: '#029844',
+              bg: '#F5F6F8',
+              border: '#E4E8EB'
+            }
+          }
+        }
+      }
+    }
+  </script>
 
   <style>
     @media print {
@@ -24,94 +43,172 @@
       margin: 0;
     }
     input[type=number] { -moz-appearance: textfield; }
+    body { background-color: #F5F6F8; }
   </style>
 </head>
-<body class="bg-gray-100 min-h-screen text-gray-800 font-sans pb-24">
+<body class="min-h-screen text-gray-900 font-sans pb-24">
 
-  <!-- 1. [자동 생성] 24개 반 QR 코드 인쇄 화면 (?mode=qr 접속 시) -->
-  <div id="qrPrintView" class="hidden p-6 max-w-5xl mx-auto">
-    <div class="no-print bg-blue-900 text-white p-4 rounded-xl mb-6 flex justify-between items-center shadow-lg">
-      <div>
-        <h1 class="text-xl font-bold">🖨️ 광주동성고 축제 부스 전용 QR 코드 출력 센터</h1>
-        <p class="text-xs text-blue-200 mt-1">아래 [인쇄하기] 버튼을 누르면 A4 용지에 맞게 자동 인쇄됩니다.</p>
+  <!-- 네이버 스타일 공통 상단 헤더 -->
+  <header class="no-print bg-white border-b border-naver-border sticky top-0 z-40 shadow-sm">
+    <div class="max-w-md mx-auto px-4 py-3 flex justify-between items-center">
+      <div class="flex items-center space-x-2">
+        <span class="bg-naver text-white font-black px-2 py-0.5 rounded text-sm tracking-tight">FESTIVAL</span>
+        <h1 class="font-bold text-base text-gray-900">동성고 부스 대기열</h1>
       </div>
-      <button onclick="window.print()" class="bg-yellow-400 hover:bg-yellow-500 text-gray-900 px-5 py-2.5 rounded-lg font-bold shadow">
+      <div class="text-xs text-gray-500 font-medium">
+        <a href="?mode=dashboard" class="text-naver font-bold hover:underline">전체부스 현황판</a>
+      </div>
+    </div>
+  </header>
+
+  <!-- 📊 1. [신규 추가] 24개 부스 실시간 현황판 모드 (?mode=dashboard) -->
+  <div id="dashboardView" class="hidden max-w-4xl mx-auto p-4">
+    <div class="bg-white p-5 rounded-xl border border-naver-border shadow-sm mb-4">
+      <div class="flex justify-between items-center mb-2">
+        <h2 class="text-lg font-bold text-gray-900 flex items-center">
+          <span class="w-2.5 h-2.5 bg-naver rounded-full mr-2 animate-pulse"></span>
+          24개 부스 실시간 대기 현황판
+        </h2>
+        <span class="text-xs text-gray-400">실시간 자동 갱신 중</span>
+      </div>
+      <p class="text-xs text-gray-500">대기 인원이 적은 부스를 확인하여 신속하게 신청하세요!</p>
+    </div>
+    <div id="dashboardGrid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3"></div>
+  </div>
+
+  <!-- 🖨️ 2. 24개 반 QR 코드 인쇄 화면 (?mode=qr) -->
+  <div id="qrPrintView" class="hidden p-6 max-w-5xl mx-auto">
+    <div class="no-print bg-white border border-naver-border p-4 rounded-xl mb-6 flex justify-between items-center shadow-sm">
+      <div>
+        <h1 class="text-lg font-bold text-gray-900">🖨️ 부스 전용 QR 코드 출력 센터</h1>
+        <p class="text-xs text-gray-500 mt-0.5">A4 용지에 최적화되어 자동 출력됩니다.</p>
+      </div>
+      <button onclick="window.print()" class="bg-naver hover:bg-naver-hover text-white px-5 py-2 rounded-lg font-bold text-sm shadow">
         인쇄하기 (Ctrl+P)
       </button>
     </div>
     <div id="qrGrid" class="grid grid-cols-2 md:grid-cols-3 gap-6"></div>
   </div>
 
-  <!-- 2. 로그인 화면 -->
-  <div id="loginView" class="hidden max-w-md mx-auto p-6 bg-white rounded-xl shadow-md mt-10 border">
-    <h2 id="boothTitle" class="text-2xl font-bold text-center text-blue-900 mb-2">부스 접속 중...</h2>
-    <p class="text-xs text-center text-gray-500 mb-6">학번 4자리와 이름을 입력하세요 (예: 1학년 4반 8번 ➔ 1408)</p>
+  <!-- 🔐 3. 로그인 화면 -->
+  <div id="loginView" class="hidden max-w-md mx-auto p-6 bg-white rounded-xl shadow-sm mt-8 border border-naver-border">
+    <div class="text-center mb-6">
+      <div class="inline-block bg-naver-light text-naver text-xs font-bold px-3 py-1 rounded-full mb-2 border border-naver/20">축제 부스 예약</div>
+      <h2 id="boothTitle" class="text-2xl font-bold text-gray-900">부스 접속 중...</h2>
+      <p class="text-xs text-gray-500 mt-1">학번 4자리와 이름을 정확히 입력해 주세요.</p>
+    </div>
     
     <div class="space-y-4">
       <div>
-        <label class="block text-xs font-bold text-gray-600 mb-1">학번 (4자리)</label>
-        <input type="number" id="studentIdInput" placeholder="예: 1408" class="w-full border p-3 rounded-lg text-lg">
+        <label class="block text-xs font-bold text-gray-700 mb-1">학번 (4자리)</label>
+        <input type="number" id="studentIdInput" placeholder="예: 1408 (1학년 4반 8번)" class="w-full border border-gray-300 p-3 rounded-lg text-base focus:outline-none focus:border-naver">
       </div>
       <div>
-        <label class="block text-xs font-bold text-gray-600 mb-1">이름</label>
-        <input type="text" id="studentNameInput" placeholder="예: 홍길동" class="w-full border p-3 rounded-lg text-lg">
+        <label class="block text-xs font-bold text-gray-700 mb-1">이름</label>
+        <input type="text" id="studentNameInput" placeholder="예: 홍길동" class="w-full border border-gray-300 p-3 rounded-lg text-base focus:outline-none focus:border-naver">
       </div>
-      <button onclick="handleLogin()" class="w-full bg-blue-600 text-white py-3.5 rounded-lg font-bold text-lg hover:bg-blue-700 shadow">입장하기</button>
+      <button onclick="handleLogin()" class="w-full bg-naver text-white py-3.5 rounded-lg font-bold text-base hover:bg-naver-hover shadow-sm">입장하기</button>
     </div>
   </div>
 
-  <!-- 3. 대기열 메인 화면 -->
-  <div id="queueView" class="hidden max-w-md mx-auto p-4">
-    <div class="flex justify-between items-center mb-4 bg-white p-3.5 rounded-lg shadow-sm border">
+  <!-- 📱 4. 대기열 메인 화면 -->
+  <div id="queueView" class="hidden max-w-md mx-auto p-4 space-y-4">
+    <!-- 프로필 & 상태 바 -->
+    <div class="bg-white p-4 rounded-xl shadow-sm border border-naver-border flex justify-between items-center">
       <div>
-        <span id="boothHeader" class="font-bold text-lg text-gray-900"></span>
-        <span id="roleBadge" class="text-xs px-2 py-1 rounded ml-2"></span>
+        <div class="flex items-center space-x-2">
+          <span id="boothHeader" class="font-bold text-lg text-gray-900"></span>
+          <span id="roleBadge" class="text-xs px-2 py-0.5 rounded font-medium"></span>
+        </div>
+        <p id="userProfileText" class="text-xs text-gray-500 mt-0.5"></p>
       </div>
-      <button onclick="logout()" class="text-xs text-gray-400 underline hover:text-gray-600">로그아웃</button>
+      <button onclick="logout()" class="text-xs text-gray-400 hover:text-gray-600 underline">로그아웃</button>
+    </div>
+
+    <!-- 🛑 [신규 추가] 운영자 전용: 부스 대기 일시 중단 스위치 -->
+    <div id="operatorControlPanel" class="hidden bg-white p-4 rounded-xl border border-purple-200 shadow-sm">
+      <div class="flex justify-between items-center">
+        <div>
+          <p class="text-xs font-bold text-purple-900">부스 대기 운영 상태 설정</p>
+          <p id="boothStateText" class="text-xs text-gray-500">현재 학생들의 신규 대기 신청을 받고 있습니다.</p>
+        </div>
+        <button id="toggleBoothBtn" onclick="toggleBoothOpenState()" class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition shadow-sm bg-naver text-white">
+          운영 중
+        </button>
+      </div>
+    </div>
+
+    <!-- 부스 정비 중 안내 배너 (학생용) -->
+    <div id="pausedBanner" class="hidden bg-amber-50 border border-amber-200 text-amber-800 p-3.5 rounded-xl text-xs font-bold text-center">
+      ⚠️ 현재 부스가 잠시 정비(일시 중지) 중입니다. 잠시 후 시도해 주세요.
     </div>
 
     <!-- 현재 대기 인원 현황 -->
-    <div class="bg-blue-50 border border-blue-200 p-4 rounded-lg text-center mb-4 shadow-sm">
-      <p class="text-xs text-gray-500 font-bold">현재 대기 중인 사람 수</p>
-      <p class="text-4xl font-black text-blue-600 mt-1"><span id="waitingCount">0</span>명</p>
+    <div class="bg-white border border-naver-border p-4 rounded-xl text-center shadow-sm">
+      <p class="text-xs text-gray-500 font-bold">현재 대기 인원</p>
+      <p class="text-3xl font-black text-naver mt-1"><span id="waitingCount">0</span>명</p>
     </div>
 
-    <!-- 대기 신청/취소 버튼 영역 -->
-    <div id="studentActionArea" class="mb-4">
-      <button id="joinBtn" onclick="requestJoin()" class="w-full bg-green-600 text-white py-3.5 rounded-xl font-bold text-lg shadow hover:bg-green-700">대기 신청하기</button>
-      <div id="loadingText" class="hidden w-full bg-gray-200 text-gray-600 py-3.5 rounded-xl font-bold text-center text-base">
+    <!-- 학생 동작 버튼 -->
+    <div id="studentActionArea">
+      <button id="joinBtn" onclick="requestJoin()" class="w-full bg-naver text-white py-3.5 rounded-xl font-bold text-base shadow-sm hover:bg-naver-hover">대기 신청하기</button>
+      <div id="loadingText" class="hidden w-full bg-gray-200 text-gray-600 py-3.5 rounded-xl font-bold text-center text-sm">
         ⏳ 대기 신청 처리 중...
       </div>
-      <button id="cancelBtn" onclick="requestCancel()" class="hidden w-full bg-red-500 text-white py-3.5 rounded-xl font-bold text-lg shadow hover:bg-red-600">대기 취소하기</button>
+      <button id="cancelBtn" onclick="requestCancel()" class="hidden w-full bg-red-500 text-white py-3.5 rounded-xl font-bold text-base shadow-sm hover:bg-red-600">대기 취소하기</button>
     </div>
 
     <!-- 실시간 대기 명단 -->
-    <h3 class="font-bold text-gray-700 mb-2 flex justify-between items-center text-sm">
-      <span>📋 대기 명단</span>
-      <span class="text-xs font-normal text-gray-500">노란색 = 내 프로필</span>
-    </h3>
-    <div id="queueListContainer" class="space-y-2 mb-10"></div>
+    <div class="bg-white p-4 rounded-xl border border-naver-border shadow-sm">
+      <h3 class="font-bold text-gray-800 mb-3 flex justify-between items-center text-sm border-b pb-2">
+        <span>📋 실시간 대기 명단</span>
+        <span class="text-xs font-normal text-gray-400">초록색 = 내 순번</span>
+      </h3>
+      <div id="queueListContainer" class="space-y-2"></div>
+    </div>
+
+    <!-- 🟡 보류 명단 (운영자 전용) -->
+    <div id="holdSection" class="hidden bg-white p-4 rounded-xl border border-amber-200 shadow-sm">
+      <h3 class="font-bold text-amber-800 mb-2 flex justify-between items-center text-sm border-b border-amber-100 pb-2">
+        <span>🟡 보류 명단 (5분 경과)</span>
+        <span id="holdCountBadge" class="text-xs font-bold bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full">0명</span>
+      </h3>
+      <div id="holdListContainer" class="space-y-2"></div>
+    </div>
   </div>
 
-  <!-- 하단 고정: 내 현재 대기 순번 바 -->
-  <div id="myRankBar" class="hidden fixed bottom-0 left-0 right-0 bg-yellow-400 text-gray-900 font-bold p-4 text-center text-lg shadow-lg border-t border-yellow-500">
-    내 현재 대기 순번: <span id="myRankText" class="text-2xl text-red-600 font-black">--</span>번째
+  <!-- ⏱️ [신규 추가] 하단 고정: 내 순번 & 예상 시간 바 (네이버 스타일) -->
+  <div id="myRankBar" class="hidden fixed bottom-0 left-0 right-0 bg-gray-900 text-white p-3.5 text-center shadow-lg border-t border-gray-800 z-30">
+    <div class="max-w-md mx-auto flex justify-between items-center text-sm">
+      <span class="text-gray-300">내 현재 대기 순번</span>
+      <div>
+        <span id="myRankText" class="text-lg text-naver font-black mr-1">--</span>번째
+        <span id="estimatedTimeText" class="text-xs text-yellow-400 ml-2 font-medium bg-gray-800 px-2 py-1 rounded">약 --분 예상</span>
+      </div>
+    </div>
   </div>
 
-  <!-- 대형 호출 팝업 모달 -->
+  <!-- 📢 5분 카운트다운 알림 모달 -->
   <div id="callModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60">
-    <div class="bg-white rounded-2xl p-6 text-center shadow-2xl max-w-sm w-full border-4 border-blue-600 transform scale-105">
-      <div class="text-5xl mb-2">📢</div>
-      <h2 class="text-2xl font-black text-gray-900 mb-2">호출되었습니다!</h2>
-      <p id="callModalText" class="text-xl font-bold text-blue-600 my-4 bg-blue-50 py-2.5 rounded-lg"></p>
-      <p class="text-xs text-gray-500 mb-6">지금 즉시 부스로 방문하여 음식을 수령해주세요!</p>
-      <button onclick="dismissCall()" class="w-full bg-blue-600 text-white py-3 rounded-xl font-bold text-lg hover:bg-blue-700">확인하였습니다</button>
+    <div class="bg-white rounded-2xl p-6 text-center shadow-xl max-w-sm w-full border border-gray-200">
+      <div class="w-12 h-12 bg-naver-light text-naver rounded-full flex items-center justify-center mx-auto mb-3 text-2xl font-bold">📢</div>
+      <h2 class="text-xl font-bold text-gray-900">부스 방문 요청</h2>
+      <p id="callModalText" class="text-sm font-bold text-naver my-2"></p>
+
+      <!-- 5분 카운트다운 타이머 -->
+      <div class="my-4 p-3 bg-red-50 border border-red-100 rounded-xl">
+        <p class="text-xs text-red-500 font-bold mb-1">남은 방문 시간</p>
+        <p id="callModalTimer" class="text-4xl font-black text-red-600 font-mono">05:00</p>
+      </div>
+
+      <p class="text-sm font-bold text-gray-700 mb-5">5분 안에 부스로 오세요!</p>
+      <button onclick="dismissCall()" class="w-full bg-naver text-white py-3 rounded-xl font-bold text-base hover:bg-naver-hover shadow">확인하였습니다</button>
     </div>
   </div>
 
   <script>
     // =========================================================================
-    // 🔥 파이어베이스 인증 정보 입력 (본인 1단계 복사값으로 변경)
+    // 🔥 파이어베이스 인증 정보 (본인의 프로젝트 키로 수정해 주세요)
     // =========================================================================
     const firebaseConfig = {
   apiKey: "AIzaSyCMJbfHs2qdvIYpYTWHuhYoWvwCoeomicM",
@@ -125,8 +222,8 @@
 
     let db = null;
     let queuesRef = null;
+    let boothConfigRef = null;
 
-    // 파이어베이스 안전 초기화 함수 (에러 방지)
     function initFirebase() {
       if (db && queuesRef) return true;
       try {
@@ -137,7 +234,7 @@
         queuesRef = db.ref('queues');
         return true;
       } catch (e) {
-        console.warn("파이어베이스 연결 대기 또는 Config 미설정:", e.message);
+        console.warn("파이어베이스 초기화 대기중:", e.message);
         return false;
       }
     }
@@ -147,18 +244,58 @@
     let studentId = "";
     let studentName = "";
     let isOperator = false;
+    let isBoothOpen = true; // 부스 운영 상태 (기본값: true)
     let currentQueueKey = null;
-    let dismissedCallKey = null;
+    let currentCallToken = null;
+    let dismissedCallToken = null;
     let allQueuesData = {};
+    let timerInterval = null;
+
+    // 🔊 [신규 추가] Web Audio API 소리 알림 (외부파일 없이 100% 작동)
+    function playChimeSound() {
+      try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) return;
+        const ctx = new AudioCtx();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.type = 'sine';
+
+        const now = ctx.currentTime;
+        osc.frequency.setValueAtTime(523.25, now);       // 도(C5)
+        osc.frequency.setValueAtTime(659.25, now + 0.15); // 미(E5)
+        osc.frequency.setValueAtTime(783.99, now + 0.3);  // 솔(G5)
+
+        gain.gain.setValueAtTime(0.3, now);
+        gain.gain.exponentialRampToValueAtTime(0.00001, now + 0.8);
+
+        osc.start(now);
+        osc.stop(now + 0.8);
+      } catch(e) {}
+    }
+
+    // 📳 [신규 추가] 스마트폰 진동 알림
+    function triggerVibration() {
+      if ('vibrate' in navigator) {
+        navigator.vibrate([400, 200, 400, 200, 400]);
+      }
+    }
 
     window.onload = function() {
       const urlParams = new URLSearchParams(window.location.search);
       currentBooth = urlParams.get('booth') || "1-1"; 
       currentMode = (urlParams.get('mode') || "").toLowerCase();
 
-      // 1. ?mode=qr 접속 시 파이어베이스 미연결 상태여도 100% 즉시 QR 화면 출력
       if (currentMode === 'qr') {
         renderQrPrintPage();
+        return;
+      }
+
+      if (currentMode === 'dashboard') {
+        renderDashboardPage();
         return;
       }
 
@@ -174,7 +311,67 @@
       } else {
         document.getElementById('loginView').classList.remove('hidden');
       }
+
+      if (!timerInterval) {
+        timerInterval = setInterval(() => {
+          if (Object.keys(allQueuesData).length > 0) {
+            renderQueue();
+          }
+        }, 1000);
+      }
     };
+
+    // 📊 [신규 추가] 24개 부스 실시간 현황판 모드
+    function renderDashboardPage() {
+      document.getElementById('dashboardView').classList.remove('hidden');
+      if (!initFirebase()) return;
+
+      const grid = document.getElementById('dashboardGrid');
+
+      // 파이어베이스 데이터 실시간 모니터링
+      db.ref().on('value', (snapshot) => {
+        const rootData = snapshot.val() || {};
+        const queues = rootData.queues || {};
+        const boothConfigs = rootData.boothConfigs || {};
+
+        grid.innerHTML = "";
+
+        for (let g = 1; g <= 3; g++) {
+          for (let c = 1; c <= 8; c++) {
+            const bId = `${g}-${c}`;
+            const isOpen = boothConfigs[bId]?.isOpen !== false;
+
+            let waitingCnt = 0;
+            Object.keys(queues).forEach(k => {
+              const item = queues[k];
+              if (item.booth === bId && (item.status === 'WAITING' || item.status === 'CALLED')) {
+                waitingCnt++;
+              }
+            });
+
+            const card = document.createElement('a');
+            card.href = `?booth=${bId}`;
+            card.className = "bg-white p-3.5 rounded-xl border border-naver-border shadow-sm hover:border-naver transition block";
+
+            let statusBadge = isOpen 
+              ? `<span class="text-[10px] font-bold bg-naver-light text-naver px-1.5 py-0.5 rounded">운영중</span>`
+              : `<span class="text-[10px] font-bold bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">정비중</span>`;
+
+            card.innerHTML = `
+              <div class="flex justify-between items-center mb-2">
+                <span class="font-bold text-sm text-gray-900">${bId}반 부스</span>
+                ${statusBadge}
+              </div>
+              <div class="text-right">
+                <span class="text-xs text-gray-400">대기</span>
+                <span class="text-xl font-black ${waitingCnt > 0 ? 'text-naver' : 'text-gray-300'} ml-1">${waitingCnt}</span>명
+              </div>
+            `;
+            grid.appendChild(card);
+          }
+        }
+      });
+    }
 
     function renderQrPrintPage() {
       document.getElementById('qrPrintView').classList.remove('hidden');
@@ -190,23 +387,21 @@
           const qrContainerId = `qr-${g}-${c}`;
 
           const card = document.createElement('div');
-          card.className = "bg-white border-2 border-gray-300 rounded-xl p-4 text-center shadow-sm flex flex-col items-center justify-between";
+          card.className = "bg-white border border-naver-border rounded-xl p-4 text-center shadow-sm flex flex-col items-center justify-between";
           card.innerHTML = `
-            <div class="font-black text-xl text-blue-900 mb-2">${boothId}반 부스 대기열</div>
+            <div class="font-bold text-lg text-gray-900 mb-2">${boothId}반 부스 대기열</div>
             <div id="${qrContainerId}" class="flex justify-center p-2 border rounded-lg bg-white my-2"></div>
-            <p class="text-xs text-gray-500 mt-1 font-bold">스캔하여 대기 순번 등록</p>
+            <p class="text-xs text-gray-400 mt-1 font-medium">QR 스캔하여 대기 순번 등록</p>
           `;
           grid.appendChild(card);
 
           try {
             new QRCode(document.getElementById(qrContainerId), {
               text: targetUrl,
-              width: 140,
-              height: 140
+              width: 130,
+              height: 130
             });
-          } catch(e) {
-            console.error("QR 생성 중 오류:", e);
-          }
+          } catch(e) {}
         }
       }
     }
@@ -252,6 +447,7 @@
         studentName = "";
         isOperator = false;
         currentQueueKey = null;
+        dismissedCallToken = null;
 
         document.getElementById('studentIdInput').value = "";
         document.getElementById('studentNameInput').value = "";
@@ -274,32 +470,85 @@
       isOperator = (userBoothCode !== "" && userBoothCode === currentBooth);
 
       document.getElementById('boothHeader').innerText = `${currentBooth}반 부스`;
+      document.getElementById('userProfileText').innerText = `${studentId} ${studentName}`;
+      
       const badge = document.getElementById('roleBadge');
       
       if (isOperator) {
         badge.innerText = "부스 운영자";
-        badge.className = "text-xs px-2 py-1 rounded ml-2 bg-purple-100 text-purple-800 font-bold border border-purple-300";
+        badge.className = "text-xs px-2 py-0.5 rounded bg-purple-100 text-purple-800 font-bold border border-purple-200";
         document.getElementById('studentActionArea').classList.add('hidden');
         document.getElementById('myRankBar').classList.add('hidden');
+        document.getElementById('holdSection').classList.remove('hidden');
+        document.getElementById('operatorControlPanel').classList.remove('hidden');
       } else {
         badge.innerText = "학생";
-        badge.className = "text-xs px-2 py-1 rounded ml-2 bg-green-100 text-green-800 font-bold border border-green-300";
+        badge.className = "text-xs px-2 py-0.5 rounded bg-naver-light text-naver font-bold border border-naver/20";
         document.getElementById('studentActionArea').classList.remove('hidden');
+        document.getElementById('holdSection').classList.add('hidden');
+        document.getElementById('operatorControlPanel').classList.add('hidden');
       }
 
       document.getElementById('queueView').classList.remove('hidden');
 
       if (initFirebase()) {
+        // 대기 데이터 구독
         queuesRef.on('value', (snapshot) => {
           allQueuesData = snapshot.val() || {};
           renderQueue();
         });
+
+        // 🛑 부스 운영 상태 구독
+        boothConfigRef = db.ref(`boothConfigs/${currentBooth}`);
+        boothConfigRef.on('value', (snap) => {
+          const cfg = snap.val();
+          isBoothOpen = cfg?.isOpen !== false;
+          updateBoothOpenUI();
+        });
       }
     }
 
+    // 🛑 부스 상태 변경 UI 갱신
+    function updateBoothOpenUI() {
+      const toggleBtn = document.getElementById('toggleBoothBtn');
+      const stateText = document.getElementById('boothStateText');
+      const pausedBanner = document.getElementById('pausedBanner');
+      const joinBtn = document.getElementById('joinBtn');
+
+      if (isBoothOpen) {
+        toggleBtn.innerText = "운영 중";
+        toggleBtn.className = "px-3.5 py-1.5 rounded-lg text-xs font-bold shadow-sm bg-naver text-white hover:bg-naver-hover";
+        stateText.innerText = "현재 학생들의 신규 대기 신청을 받고 있습니다.";
+        pausedBanner.classList.add('hidden');
+        if (!isOperator) joinBtn.disabled = false;
+      } else {
+        toggleBtn.innerText = "일시 정지";
+        toggleBtn.className = "px-3.5 py-1.5 rounded-lg text-xs font-bold shadow-sm bg-amber-500 text-white hover:bg-amber-600";
+        stateText.innerText = "신규 대기 신청이 일시 중단된 상태입니다.";
+        if (!isOperator) {
+          pausedBanner.classList.remove('hidden');
+          joinBtn.disabled = true;
+        }
+      }
+    }
+
+    // 🛑 운영자의 부스 일시정지/운영 스위치 토글
+    function toggleBoothOpenState() {
+      if (!initFirebase()) return;
+      boothConfigRef.update({ isOpen: !isBoothOpen });
+    }
+
+    function formatTime(seconds) {
+      if (seconds <= 0) return "00:00";
+      const m = Math.floor(seconds / 60);
+      const s = seconds % 60;
+      return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    }
+
     function renderQueue() {
-      let thisBoothList = [];
-      let activeCountTotal = 0;
+      const now = Date.now();
+      let normalQueueList = [];
+      let holdQueueList = [];
       let userInThisBooth = null;
 
       Object.keys(allQueuesData).forEach(key => {
@@ -307,50 +556,66 @@
         item.key = key;
 
         if (item.studentId === studentId && (item.status === 'WAITING' || item.status === 'CALLED')) {
-          activeCountTotal++;
           if (item.booth === currentBooth) {
             userInThisBooth = item;
           }
         }
 
         if (item.booth === currentBooth && (item.status === 'WAITING' || item.status === 'CALLED')) {
-          thisBoothList.push(item);
+          if (item.status === 'CALLED') {
+            const elapsed = Math.floor((now - (item.calledAt || now)) / 1000);
+            item.remainingSeconds = 300 - elapsed;
+            
+            if (item.remainingSeconds <= 0) {
+              holdQueueList.push(item);
+            } else {
+              normalQueueList.push(item);
+            }
+          } else {
+            normalQueueList.push(item);
+          }
         }
       });
 
-      thisBoothList.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+      normalQueueList.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+      holdQueueList.sort((a, b) => (a.calledAt || 0) - (b.calledAt || 0));
 
-      document.getElementById('waitingCount').innerText = thisBoothList.length;
+      document.getElementById('waitingCount').innerText = normalQueueList.length;
+
+      // 1) 일반 대기 명단
       const container = document.getElementById('queueListContainer');
       container.innerHTML = "";
 
       let myIndex = -1;
-      let firstWaitingIndex = thisBoothList.findIndex(item => item.status === 'WAITING');
 
-      thisBoothList.forEach((item, index) => {
+      normalQueueList.forEach((item, index) => {
         const isMe = (item.studentId === studentId);
         if (isMe && item.status === 'WAITING') myIndex = index + 1;
 
         const card = document.createElement('div');
-        let bgClass = isMe ? "bg-yellow-200 border-2 border-yellow-500 font-bold" : "bg-white border";
-        card.className = `p-3 rounded-lg shadow-sm flex justify-between items-center ${bgClass}`;
+        let bgClass = isMe ? "bg-naver-light border border-naver/30 font-bold" : "bg-white border border-gray-100";
+        card.className = `p-3 rounded-lg flex justify-between items-center ${bgClass}`;
 
         let operatorControls = "";
         if (isOperator) {
-          if (index === firstWaitingIndex && item.status === 'WAITING') {
-            operatorControls = `<button onclick="callUser('${item.key}')" class="bg-blue-600 text-white text-xs px-3 py-1.5 rounded-lg font-bold hover:bg-blue-700">호출하기</button>`;
+          if (item.status === 'WAITING') {
+            operatorControls = `<button onclick="callUser('${item.key}')" class="bg-naver text-white text-xs px-3 py-1.5 rounded-md font-bold hover:bg-naver-hover shadow-sm">호출하기</button>`;
           } else if (item.status === 'CALLED') {
-            operatorControls = `<span class="text-xs text-red-600 font-bold mr-2">📢 호출됨</span>
-              <button onclick="completeUser('${item.key}')" class="bg-gray-800 text-white text-xs px-3 py-1.5 rounded-lg font-bold hover:bg-black">완료 처리</button>`;
+            const timerStr = formatTime(item.remainingSeconds);
+            operatorControls = `
+              <div class="flex items-center space-x-1.5">
+                <span class="text-xs text-red-600 font-bold bg-red-50 px-2 py-1 rounded border border-red-200">📢 ${timerStr}</span>
+                <button onclick="completeUser('${item.key}')" class="bg-gray-800 text-white text-xs px-2.5 py-1.5 rounded-md font-bold hover:bg-black">완료</button>
+              </div>`;
           }
         }
 
         card.innerHTML = `
           <div class="flex items-center space-x-3">
-            <span class="text-gray-400 w-5 text-center font-bold text-sm">${index + 1}</span>
+            <span class="text-gray-400 w-5 text-center font-bold text-xs">${index + 1}</span>
             <div>
               <p class="text-sm font-bold text-gray-900">${item.studentId} ${item.studentName}</p>
-              ${item.status === 'CALLED' ? '<span class="text-xs text-red-500 font-bold">호출 상태입니다</span>' : ''}
+              ${item.status === 'CALLED' ? `<span class="text-xs text-red-500 font-bold">호출됨 (남은시간 ${formatTime(item.remainingSeconds)})</span>` : ''}
             </div>
           </div>
           <div>${operatorControls}</div>
@@ -358,6 +623,39 @@
         container.appendChild(card);
       });
 
+      // 2) 🟡 보류 명단 (운영자 전용)
+      if (isOperator) {
+        document.getElementById('holdCountBadge').innerText = `${holdQueueList.length}명`;
+        const holdContainer = document.getElementById('holdListContainer');
+        holdContainer.innerHTML = "";
+
+        if (holdQueueList.length === 0) {
+          holdContainer.innerHTML = `<p class="text-xs text-gray-400 text-center py-2">보류 중인 대상이 없습니다.</p>`;
+        } else {
+          holdQueueList.forEach((item) => {
+            const card = document.createElement('div');
+            card.className = "p-3 rounded-lg flex justify-between items-center bg-amber-50 border border-amber-200";
+
+            card.innerHTML = `
+              <div class="flex items-center space-x-2">
+                <span class="text-amber-500 font-bold text-xs">🟡</span>
+                <div>
+                  <p class="text-sm font-bold text-amber-900">${item.studentId} ${item.studentName}</p>
+                  <span class="text-[11px] text-amber-700 font-medium">5분 경과 (보류)</span>
+                </div>
+              </div>
+              <div class="flex items-center space-x-1">
+                <button onclick="callUser('${item.key}')" class="bg-naver text-white text-xs px-2 py-1.5 rounded font-bold hover:bg-naver-hover">재호출</button>
+                <button onclick="completeUser('${item.key}')" class="bg-gray-800 text-white text-xs px-2 py-1.5 rounded font-bold hover:bg-black">완료</button>
+                <button onclick="cancelUserByOperator('${item.key}')" class="bg-red-600 text-white text-xs px-2 py-1.5 rounded font-bold hover:bg-red-700">취소</button>
+              </div>
+            `;
+            holdContainer.appendChild(card);
+          });
+        }
+      }
+
+      // 3) 학생 UI & 예상 소요시간 계산
       if (!isOperator) {
         const joinBtn = document.getElementById('joinBtn');
         const loadingText = document.getElementById('loadingText');
@@ -372,8 +670,12 @@
 
           myRankBar.classList.remove('hidden');
           document.getElementById('myRankText').innerText = myIndex > 0 ? myIndex : "--";
+          
+          // ⏱️ [신규 추가] 예상 소요시간 자동 계산 (팀당 약 3분 기준)
+          const estMins = myIndex > 0 ? myIndex * 3 : 0;
+          document.getElementById('estimatedTimeText').innerText = `약 ${estMins}분 소요 예상`;
         } else {
-          joinBtn.classList.remove('hidden');
+          if (isBoothOpen) joinBtn.classList.remove('hidden');
           loadingText.classList.add('hidden');
           cancelBtn.classList.add('hidden');
           myRankBar.classList.add('hidden');
@@ -381,8 +683,14 @@
         }
 
         if (userInThisBooth && userInThisBooth.status === 'CALLED') {
-          if (dismissedCallKey !== userInThisBooth.key) {
-            triggerCallAlert(userInThisBooth.key);
+          const elapsed = Math.floor((now - (userInThisBooth.calledAt || now)) / 1000);
+          const remain = Math.max(0, 300 - elapsed);
+
+          document.getElementById('callModalTimer').innerText = formatTime(remain);
+
+          const callToken = `${userInThisBooth.key}_${userInThisBooth.calledAt || 0}`;
+          if (dismissedCallToken !== callToken) {
+            triggerCallAlert(userInThisBooth.key, callToken);
           }
         }
       }
@@ -390,7 +698,12 @@
 
     function requestJoin() {
       if (!initFirebase()) {
-        alert("파이어베이스 설정 정보(firebaseConfig)가 바르게 입력되지 않았습니다.");
+        alert("파이어베이스 연결 정보가 올바르지 않습니다.");
+        return;
+      }
+
+      if (!isBoothOpen) {
+        alert("현재 부스가 정비 중이어서 대기를 신청할 수 없습니다.");
         return;
       }
 
@@ -450,7 +763,10 @@
 
     function callUser(key) {
       if (!initFirebase()) return;
-      queuesRef.child(key).update({ status: 'CALLED' });
+      queuesRef.child(key).update({
+        status: 'CALLED',
+        calledAt: firebase.database.ServerValue.TIMESTAMP
+      });
     }
 
     function completeUser(key) {
@@ -458,8 +774,21 @@
       queuesRef.child(key).update({ status: 'COMPLETED' });
     }
 
-    function triggerCallAlert(key) {
+    function cancelUserByOperator(key) {
+      if (!initFirebase()) return;
+      if (confirm("해당 학생의 대기를 취소하시겠습니까?")) {
+        queuesRef.child(key).update({ status: 'CANCELLED' });
+      }
+    }
+
+    function triggerCallAlert(key, token) {
       currentQueueKey = key;
+      currentCallToken = token;
+      
+      // 🔊 📳 소리 & 진동 실행
+      playChimeSound();
+      triggerVibration();
+
       const modal = document.getElementById('callModal');
       if (modal.classList.contains('hidden')) {
         document.getElementById('callModalText').innerText = `${currentBooth}반 부스`;
@@ -468,7 +797,7 @@
     }
 
     function dismissCall() {
-      dismissedCallKey = currentQueueKey;
+      dismissedCallToken = currentCallToken;
       document.getElementById('callModal').classList.add('hidden');
     }
   </script>
